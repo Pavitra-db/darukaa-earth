@@ -1,14 +1,41 @@
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
-class ProjectCreate(BaseModel):
+class ProjectBase(BaseModel):
     name: str
-    description: str
-    location: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = "planned"
 
 
-class SiteCreate(BaseModel):
+class ProjectCreate(ProjectBase):
+    pass
+
+
+class ProjectResponse(ProjectBase):
+    id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SiteBase(BaseModel):
     name: str
     latitude: float
     longitude: float
-    area_hectares: float
+    description: Optional[str] = None
+
+
+class SiteCreate(SiteBase):
+    project_id: int
+
+
+class SiteResponse(SiteBase):
+    id: int
+    project_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

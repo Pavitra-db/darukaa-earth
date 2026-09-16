@@ -1,39 +1,90 @@
-from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey
-from sqlalchemy.orm import relationship
+from datetime import datetime
 
-from database import Base
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
 
 
 class Project(Base):
     __tablename__ = "projects"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    description = Column(Text, nullable=False)
-    location = Column(String(150), nullable=False)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
-    sites = relationship(
-        "Site",
+    name: Mapped[str] = mapped_column(
+        String(150),
+        nullable=False
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    location: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="planned"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    sites: Mapped[list["Site"]] = relationship(
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan"
     )
 
 
 class Site(Base):
     __tablename__ = "sites"
 
-    id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(
+    id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("projects.id"),
-        nullable=False,
+        primary_key=True,
+        index=True
     )
-    name = Column(String(100), nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    area_hectares = Column(Float, nullable=False)
 
-    project = relationship(
-        "Project",
-        back_populates="sites",
+    name: Mapped[str] = mapped_column(
+        String(150),
+        nullable=False
+    )
+
+    latitude: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    longitude: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id"),
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    project: Mapped["Project"] = relationship(
+        back_populates="sites"
     )

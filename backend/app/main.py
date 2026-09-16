@@ -3,9 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Project, Site
-from schemas import ProjectCreate, SiteCreate
+from app.database import get_db
+from app.models import Project, Site
+from app.schemas import (
+    ProjectCreate,
+    ProjectResponse,
+    SiteCreate,
+    SiteResponse,
+)
 
 
 # --------------------------------------------------
