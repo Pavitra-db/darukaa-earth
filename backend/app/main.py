@@ -1,263 +1,199 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth import create_access_token, hash_password, verify_password
 from app.database import get_db
-from app.models import Project, Site
+from app.models import Project, Site, User
 from app.schemas import (
+    LoginRequest,
     ProjectCreate,
     ProjectResponse,
     SiteCreate,
     SiteResponse,
+    TokenResponse,
+    UserCreate,
+    UserResponse,
 )
 
 
-# --------------------------------------------------
-# Create FastAPI application
-# --------------------------------------------------
-
 app = FastAPI(
     title="Darukaa.Earth API",
-    description="Backend API for the Darukaa.Earth platform",
+    description="Backend API for Darukaa.Earth",
     version="1.0.0",
 )
 
 
-# --------------------------------------------------
-# CORS Configuration
-# --------------------------------------------------
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# --------------------------------------------------
-# Basic Routes
-# --------------------------------------------------
-
 @app.get("/")
-def home():
+def root():
     return {
-        "message": "Darukaa.Earth backend is running"
+        "message": "Darukaa.Earth API is running"
     }
 
 
-@app.get("/health")
-def health_check():
+# -------------------------
+# User Registration
+# -------------------------
+
+@app.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def register_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user_data.email)
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    new_user = User(
+        name=user_data.name,
+        email=user_data.email,
+        hashed_password=hash_password(user_data.password),
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
+
+# -------------------------
+# User Login
+# -------------------------
+
+@app.post(
+    "/login",
+    response_model=TokenResponse
+)
+def login_user(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.email == login_data.email)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(
+        login_data.password,
+        user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email
+        }
+    )
+
     return {
-        "status": "healthy"
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 
-# --------------------------------------------------
-# Project APIs
-# --------------------------------------------------
+# -------------------------
+# Projects
+# -------------------------
 
-@app.post("/projects")
+@app.post(
+    "/projects",
+    response_model=ProjectResponse
+)
 def create_project(
-    project: ProjectCreate,
-    db: Session = Depends(get_db),
+    project_data: ProjectCreate,
+    db: Session = Depends(get_db)
 ):
     new_project = Project(
-        name=project.name,
-        description=project.description,
-        location=project.location,
+        name=project_data.name,
+        description=project_data.description,
+        location=project_data.location,
+        status=project_data.status,
     )
 
     db.add(new_project)
     db.commit()
     db.refresh(new_project)
 
-    return {
-        "message": "Project created successfully",
-        "project": {
-            "id": new_project.id,
-            "name": new_project.name,
-            "description": new_project.description,
-            "location": new_project.location,
-        },
-    }
+    return new_project
 
 
-@app.get("/projects")
+@app.get(
+    "/projects",
+    response_model=list[ProjectResponse]
+)
 def get_projects(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db)
 ):
-    projects = db.query(Project).all()
-
-    return {
-        "projects": [
-            {
-                "id": project.id,
-                "name": project.name,
-                "description": project.description,
-                "location": project.location,
-            }
-            for project in projects
-        ]
-    }
+    return db.query(Project).all()
 
 
-@app.get("/projects/{project_id}")
-def get_project(
-    project_id: int,
-    db: Session = Depends(get_db),
-):
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+# -------------------------
+# Sites
+# -------------------------
 
-    if project is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Project not found",
-        )
-
-    return {
-        "id": project.id,
-        "name": project.name,
-        "description": project.description,
-        "location": project.location,
-    }
-
-
-# --------------------------------------------------
-# Site APIs
-# --------------------------------------------------
-
-@app.post("/projects/{project_id}/sites")
+@app.post(
+    "/sites",
+    response_model=SiteResponse
+)
 def create_site(
-    project_id: int,
-    site: SiteCreate,
-    db: Session = Depends(get_db),
+    site_data: SiteCreate,
+    db: Session = Depends(get_db)
 ):
     project = (
         db.query(Project)
-        .filter(Project.id == project_id)
+        .filter(Project.id == site_data.project_id)
         .first()
     )
 
-    if project is None:
+    if not project:
         raise HTTPException(
             status_code=404,
-            detail="Project not found",
-        )
-
-    if not -90 <= site.latitude <= 90:
-        raise HTTPException(
-            status_code=400,
-            detail="Latitude must be between -90 and 90",
-        )
-
-    if not -180 <= site.longitude <= 180:
-        raise HTTPException(
-            status_code=400,
-            detail="Longitude must be between -180 and 180",
-        )
-
-    if site.area_hectares <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Area must be greater than zero",
+            detail="Project not found"
         )
 
     new_site = Site(
-        project_id=project_id,
-        name=site.name,
-        latitude=site.latitude,
-        longitude=site.longitude,
-        area_hectares=site.area_hectares,
+        name=site_data.name,
+        latitude=site_data.latitude,
+        longitude=site_data.longitude,
+        description=site_data.description,
+        project_id=site_data.project_id,
     )
 
     db.add(new_site)
     db.commit()
     db.refresh(new_site)
 
-    return {
-        "message": "Site created successfully",
-        "site": {
-            "id": new_site.id,
-            "project_id": new_site.project_id,
-            "name": new_site.name,
-            "latitude": new_site.latitude,
-            "longitude": new_site.longitude,
-            "area_hectares": new_site.area_hectares,
-        },
-    }
+    return new_site
 
 
-@app.get("/projects/{project_id}/sites")
-def get_project_sites(
-    project_id: int,
-    db: Session = Depends(get_db),
+@app.get(
+    "/sites",
+    response_model=list[SiteResponse]
+)
+def get_sites(
+    db: Session = Depends(get_db)
 ):
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
-
-    if project is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Project not found",
-        )
-
-    project_sites = (
-        db.query(Site)
-        .filter(Site.project_id == project_id)
-        .all()
-    )
-
-    return {
-        "project_id": project_id,
-        "sites": [
-            {
-                "id": site.id,
-                "project_id": site.project_id,
-                "name": site.name,
-                "latitude": site.latitude,
-                "longitude": site.longitude,
-                "area_hectares": site.area_hectares,
-            }
-            for site in project_sites
-        ],
-    }
-
-
-@app.get("/sites/{site_id}")
-def get_site(
-    site_id: int,
-    db: Session = Depends(get_db),
-):
-    site = (
-        db.query(Site)
-        .filter(Site.id == site_id)
-        .first()
-    )
-
-    if site is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Site not found",
-        )
-
-    return {
-        "id": site.id,
-        "project_id": site.project_id,
-        "name": site.name,
-        "latitude": site.latitude,
-        "longitude": site.longitude,
-        "area_hectares": site.area_hectares,
-    }
+    return db.query(Site).all()
