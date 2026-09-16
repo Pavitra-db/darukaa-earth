@@ -1,27 +1,39 @@
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.models import Project, Site, User
 from app.schemas import (
-    LoginRequest,
     ProjectCreate,
     ProjectResponse,
     SiteCreate,
     SiteResponse,
-    TokenResponse,
     UserCreate,
     UserResponse,
+    LoginRequest,
+    TokenResponse,
+)
+from app.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
 )
 
 
-app = FastAPI(
-    title="Darukaa.Earth API",
-    description="Backend API for Darukaa.Earth",
-    version="1.0.0",
-)
+app = FastAPI(title="Darukaa.Earth API")
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
