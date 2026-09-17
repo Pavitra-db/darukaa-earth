@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app import schemas
+from app.database import Base, engine, get_db
 
-from app.database import get_db
 
 from app.models import (
     Project,
@@ -48,6 +49,18 @@ app = FastAPI(
     description="Backend API for Darukaa.Earth",
     version="1.0.0",
 )
+
+# ---------------------------------------------------
+# Initialize Render Database
+# ---------------------------------------------------
+@app.on_event("startup")
+def initialize_database():
+    with engine.begin() as connection:
+        connection.execute(
+            text("CREATE EXTENSION IF NOT EXISTS postgis")
+        )
+
+    Base.metadata.create_all(bind=engine)
 
 
 # =====================================================
