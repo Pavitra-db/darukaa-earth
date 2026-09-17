@@ -1,13 +1,25 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    Float,
+    DateTime,
+    ForeignKey,
+)
 from sqlalchemy.sql import func
-
+from geoalchemy2 import Geometry
 from app.database import Base
 
 
 class Project(Base):
     __tablename__ = "projects"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     name = Column(
         String(100),
@@ -46,6 +58,7 @@ class Site(Base):
 
     project_id = Column(
         Integer,
+        ForeignKey("projects.id"),
         nullable=False
     )
 
@@ -78,6 +91,13 @@ class Site(Base):
         DateTime,
         server_default=func.now()
     )
+    boundary = Column(
+    Geometry(
+        geometry_type="POLYGON",
+        srid=4326,
+    ),
+    nullable=True,
+   )
 
 
 class User(Base):
@@ -107,6 +127,51 @@ class User(Base):
     )
 
     created_at = Column(
+        DateTime,
+        server_default=func.now()
+    )
+
+
+# =====================================================
+# ENVIRONMENTAL READINGS
+# =====================================================
+
+class EnvironmentalReading(Base):
+    __tablename__ = "environmental_readings"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    site_id = Column(
+        Integer,
+        ForeignKey("sites.id"),
+        nullable=False
+    )
+
+    temperature = Column(
+        Float,
+        nullable=True
+    )
+
+    rainfall = Column(
+        Float,
+        nullable=True
+    )
+
+    air_quality = Column(
+        Float,
+        nullable=True
+    )
+
+    soil_moisture = Column(
+        Float,
+        nullable=True
+    )
+
+    recorded_at = Column(
         DateTime,
         server_default=func.now()
     )

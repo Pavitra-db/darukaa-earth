@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
+import EnvironmentalMonitoring from "./components/EnvironmentalMonitoring";
 import {
   loginUser,
   registerUser,
@@ -10,7 +10,7 @@ import {
 
 import MapView from "./components/MapView";
 import MonitoringSites from "./components/MonitoringSites";
-
+import Projects from "./components/Projects";
 import "./App.css";
 
 
@@ -981,6 +981,13 @@ function App() {
 
             </>
           )}
+{/* =================================================
+    PROJECTS
+================================================= */}
+
+{activePage === "Projects" && (
+  <Projects />
+)}
 
 
           {/* =================================================
@@ -991,10 +998,9 @@ function App() {
             <MapView />
           )}
 
-
-          {/* =================================================
-              OTHER PAGES
-          ================================================= */}
+{/* =================================================
+    MONITORING SITES
+================================================= */}
 
 {activePage === "Monitoring Sites" && (
   <MonitoringSites
@@ -1002,9 +1008,24 @@ function App() {
   />
 )}
 
+
+{/* =================================================
+    ENVIRONMENTAL MONITORING
+================================================= */}
+
+{activePage === "Analytics" && (
+  <EnvironmentalMonitoring />
+)}
+
+{/* =================================================
+    OTHER PAGES
+================================================= */}
+
 {activePage !== "Dashboard" &&
+   activePage !== "Projects" &&
   activePage !== "Map View" &&
-  activePage !== "Monitoring Sites" && (
+  activePage !== "Monitoring Sites" &&
+  activePage !== "Analytics" && (
     <section className="coming-soon">
 
       <div className="coming-icon">
@@ -1031,10 +1052,9 @@ function App() {
 
     </section>
   )}
+
         </main>
-
       </div>
-
     </div>
   );
 }

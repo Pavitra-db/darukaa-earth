@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -32,6 +32,11 @@ class ProjectResponse(ProjectBase):
 # SITE SCHEMAS
 # =====================================================
 
+class Coordinate(BaseModel):
+    lat: float
+    lng: float
+
+
 class SiteBase(BaseModel):
     name: str
     latitude: float
@@ -42,12 +47,17 @@ class SiteBase(BaseModel):
 
 class SiteCreate(SiteBase):
     project_id: int
+    boundary: List[Coordinate]
 
+class SiteUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 class SiteResponse(SiteBase):
     id: int
     project_id: int
     created_at: datetime
+    boundary: Optional[List[Coordinate]] = None
 
     model_config = ConfigDict(
         from_attributes=True
@@ -87,3 +97,32 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+# =====================================================
+# ENVIRONMENTAL READING SCHEMAS
+# =====================================================
+
+class EnvironmentalReadingCreate(BaseModel):
+    site_id: int
+
+    temperature: Optional[float] = None
+    rainfall: Optional[float] = None
+    air_quality: Optional[float] = None
+    soil_moisture: Optional[float] = None
+
+
+class EnvironmentalReadingResponse(BaseModel):
+    id: int
+    site_id: int
+
+    temperature: Optional[float] = None
+    rainfall: Optional[float] = None
+    air_quality: Optional[float] = None
+    soil_moisture: Optional[float] = None
+
+    recorded_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
