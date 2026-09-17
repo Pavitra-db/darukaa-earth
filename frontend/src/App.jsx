@@ -9,6 +9,7 @@ import {
 } from "./api";
 
 import MapView from "./components/MapView";
+import MonitoringSites from "./components/MonitoringSites";
 
 import "./App.css";
 
@@ -995,37 +996,41 @@ function App() {
               OTHER PAGES
           ================================================= */}
 
-          {activePage !== "Dashboard" &&
-            activePage !== "Map View" && (
+{activePage === "Monitoring Sites" && (
+  <MonitoringSites
+    onAddSite={() => setActivePage("Map View")}
+  />
+)}
 
-              <section className="coming-soon">
+{activePage !== "Dashboard" &&
+  activePage !== "Map View" &&
+  activePage !== "Monitoring Sites" && (
+    <section className="coming-soon">
 
-                <div className="coming-icon">
-                  🌱
-                </div>
+      <div className="coming-icon">
+        🌱
+      </div>
 
-                <h2>
-                  {activePage}
-                </h2>
+      <h2>
+        {activePage}
+      </h2>
 
-                <p>
-                  This section is ready for the next
-                  stage of Darukaa.Earth.
-                </p>
+      <p>
+        This section is ready for the next
+        stage of Darukaa.Earth.
+      </p>
 
-                <button
-                  className="add-project-button"
-                  onClick={() =>
-                    setActivePage("Dashboard")
-                  }
-                >
-                  Back to Dashboard
-                </button>
+      <button
+        className="add-project-button"
+        onClick={() =>
+          setActivePage("Dashboard")
+        }
+      >
+        Back to Dashboard
+      </button>
 
-              </section>
-
-            )}
-
+    </section>
+  )}
         </main>
 
       </div>
