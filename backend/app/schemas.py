@@ -4,6 +4,10 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
+# =====================================================
+# PROJECT SCHEMAS
+# =====================================================
+
 class ProjectBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -19,13 +23,20 @@ class ProjectResponse(ProjectBase):
     id: int
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
+
+# =====================================================
+# SITE SCHEMAS
+# =====================================================
 
 class SiteBase(BaseModel):
     name: str
     latitude: float
     longitude: float
+    area_hectares: float
     description: Optional[str] = None
 
 
@@ -38,7 +49,15 @@ class SiteResponse(SiteBase):
     project_id: int
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+# =====================================================
+# USER SCHEMAS
+# =====================================================
+
 class UserCreate(BaseModel):
     name: str
     email: str
@@ -51,8 +70,14 @@ class UserResponse(BaseModel):
     email: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
+
+# =====================================================
+# LOGIN
+# =====================================================
 
 class LoginRequest(BaseModel):
     email: str

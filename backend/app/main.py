@@ -206,7 +206,6 @@ def create_site(
     site_data: SiteCreate,
     db: Session = Depends(get_db),
 ):
-    # Check whether project exists
     project = (
         db.query(Project)
         .filter(Project.id == site_data.project_id)
@@ -220,11 +219,12 @@ def create_site(
         )
 
     new_site = Site(
+        project_id=site_data.project_id,
         name=site_data.name,
         latitude=site_data.latitude,
         longitude=site_data.longitude,
+        area_hectares=site_data.area_hectares,
         description=site_data.description,
-        project_id=site_data.project_id,
     )
 
     db.add(new_site)
