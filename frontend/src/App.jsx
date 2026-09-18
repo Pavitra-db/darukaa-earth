@@ -429,10 +429,7 @@ function App() {
               label: "Analytics",
               icon: "◔",
             },
-            {
-              label: "Profile",
-              icon: "◯",
-            },
+            
           ].map((item) => (
 
             <button
