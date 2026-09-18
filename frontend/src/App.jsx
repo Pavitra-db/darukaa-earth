@@ -550,6 +550,25 @@ function App() {
 
             </div>
 
+
+            <button
+              type="button"
+              onClick={logout}
+              title="Logout"
+              style={{
+                border: "1px solid #d0d5dd",
+                background: "#ffffff",
+                color: "#344054",
+                borderRadius: "8px",
+                padding: "9px 14px",
+                fontSize: "14px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+
           </div>
 
         </header>

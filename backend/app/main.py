@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from jose import jwt, JWTError
 
 from app import schemas
 from app.database import Base, engine, get_db
@@ -31,6 +33,7 @@ from app.auth import (
     hash_password,
     verify_password,
     create_access_token,
+    SECRET_KEY,
 )
 
 from app.services.nasa_power import fetch_latest_weather
@@ -61,6 +64,142 @@ def initialize_database():
         )
 
     Base.metadata.create_all(bind=engine)
+
+    # Add ownership to projects for existing databases.
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id INTEGER")
+        )
+
+        connection.execute(
+            text("""
+                UPDATE projects
+                SET user_id = (
+                    SELECT id
+                    FROM users
+                    ORDER BY id
+                    LIMIT 1
+                )
+                WHERE user_id IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM users
+                  )
+            """)
+        )
+
+        connection.execute(
+            text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'projects_user_id_fkey'
+                    ) THEN
+                        ALTER TABLE projects
+                        ADD CONSTRAINT projects_user_id_fkey
+                        FOREIGN KEY (user_id)
+                        REFERENCES users(id);
+                    END IF;
+                END
+                $$;
+            """)
+        )
+
+        connection.execute(
+            text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM projects
+                        WHERE user_id IS NULL
+                    ) THEN
+                        ALTER TABLE projects
+                        ALTER COLUMN user_id SET NOT NULL;
+                    END IF;
+                END
+                $$;
+            """)
+        )
+
+        # Correct the two legacy demo projects.
+        # Project IDs 1 and 2 existed before per-user ownership was added.
+        # Keep those legacy projects with the original test account.
+        connection.execute(
+            text("""
+                UPDATE projects
+                SET user_id = (
+                    SELECT id
+                    FROM users
+                    WHERE email = 'test1@gmail.com'
+                    LIMIT 1
+                )
+                WHERE id IN (1, 2)
+                  AND EXISTS (
+                      SELECT 1
+                      FROM users
+                      WHERE email = 'test1@gmail.com'
+                  )
+            """)
+        )
+
+
+# =====================================================
+# AUTHENTICATED USER
+# =====================================================
+
+security = HTTPBearer(auto_error=False)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=["HS256"],
+        )
+
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+
+        user_id = int(user_id)
+
+    except HTTPException:
+        raise
+
+    except (JWTError, ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    return user
 
 
 # =====================================================
@@ -190,6 +329,7 @@ def login_user(
 )
 def create_project(
     project_data: ProjectCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     new_project = Project(
@@ -197,6 +337,7 @@ def create_project(
         description=project_data.description,
         location=project_data.location,
         status=project_data.status,
+        user_id=current_user.id,
     )
 
     db.add(new_project)
@@ -215,10 +356,12 @@ def create_project(
     response_model=list[ProjectResponse],
 )
 def get_projects(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     projects = (
         db.query(Project)
+        .filter(Project.user_id == current_user.id)
         .order_by(Project.id.desc())
         .all()
     )
@@ -269,8 +412,24 @@ def site_to_response(site_db):
 )
 def create_site(
     site: schemas.SiteCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == site.project_id,
+            Project.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
     # At least 3 points are required
     if len(site.boundary) < 3:
         raise HTTPException(
@@ -342,10 +501,13 @@ def create_site(
     response_model=list[SiteResponse],
 )
 def get_sites(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     sites = (
         db.query(Site)
+        .join(Project, Site.project_id == Project.id)
+        .filter(Project.user_id == current_user.id)
         .order_by(Site.id.desc())
         .all()
     )
@@ -367,11 +529,16 @@ def get_sites(
 def update_site(
     site_id: int,
     site_data: schemas.SiteUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     site = (
         db.query(Site)
-        .filter(Site.id == site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -418,12 +585,16 @@ def update_site(
 @app.delete("/projects/{project_id}")
 def delete_project(
     project_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Find project
     project = (
         db.query(Project)
-        .filter(Project.id == project_id)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -477,11 +648,16 @@ def delete_project(
 @app.delete("/sites/{site_id}")
 def delete_site(
     site_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     site = (
         db.query(Site)
-        .filter(Site.id == site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -529,12 +705,17 @@ def delete_site(
 )
 def create_environmental_reading(
     reading_data: EnvironmentalReadingCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Verify site exists
     site = (
         db.query(Site)
-        .filter(Site.id == reading_data.site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == reading_data.site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -569,12 +750,17 @@ def create_environmental_reading(
 )
 def get_site_readings(
     site_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Verify site exists
     site = (
         db.query(Site)
-        .filter(Site.id == site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -609,12 +795,17 @@ def get_site_readings(
 )
 def fetch_site_weather(
     site_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Find monitoring site
     site = (
         db.query(Site)
-        .filter(Site.id == site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -660,12 +851,17 @@ def fetch_site_weather(
 @app.get("/sites/{site_id}/biodiversity")
 def get_site_biodiversity(
     site_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Find monitoring site
     site = (
         db.query(Site)
-        .filter(Site.id == site_id)
+        .join(Project, Site.project_id == Project.id)
+        .filter(
+            Site.id == site_id,
+            Project.user_id == current_user.id,
+        )
         .first()
     )
 
