@@ -173,10 +173,11 @@ def login_user(
     )
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
-    }
-
+    "access_token": access_token,
+    "token_type": "bearer",
+    "name": user.name,
+    "email": user.email,
+}
 
 # =====================================================
 # CREATE PROJECT
