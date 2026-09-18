@@ -18,7 +18,9 @@ function App() {
   // =====================================================
   // AUTHENTICATION STATE
   // =====================================================
-
+  const [userName, setUserName] = useState(
+  localStorage.getItem("darukaa_user_name") || ""
+  );
   const [mode, setMode] = useState("login");
 
   const [name, setName] = useState("");
@@ -117,6 +119,13 @@ function App() {
           result.access_token
         );
 
+        localStorage.setItem(
+          "darukaa_user_name",
+          result.name || ""
+        );
+
+        setUserName(result.name || "");
+
         setLoggedIn(true);
         setActivePage("Dashboard");
 
@@ -175,6 +184,8 @@ function App() {
 
   function logout() {
     localStorage.removeItem("darukaa_token");
+    localStorage.removeItem("darukaa_user_name");
+    setUserName("");
 
     setLoggedIn(false);
 
@@ -516,14 +527,14 @@ function App() {
             <div className="user-profile">
 
               <div className="avatar">
-                P
+                {userName ? userName.charAt(0).toUpperCase() : "U"}
               </div>
 
 
               <div className="user-info">
 
                 <strong>
-                  Pavitra Badiger
+                  {userName || "User"}
                 </strong>
 
                 <span>
@@ -568,7 +579,7 @@ function App() {
                   </span>
 
                   <h2>
-                    Pavitra!
+                    {userName || "Welcome"}!
                   </h2>
 
                   <p>

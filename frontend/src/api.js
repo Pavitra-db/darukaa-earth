@@ -35,31 +35,28 @@ export async function registerUser(userData) {
 // LOGIN USER
 // =====================================================
 
-export async function loginUser(loginData) {
-  const response = await fetch(
-    `${API_BASE_URL}/login`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify(loginData),
-    }
-  );
+export async function loginUser({ email, password }) {
+  const response = await fetch(`${API_BASE_URL}/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
 
   const data = await response.json();
 
   if (!response.ok) {
     throw new Error(
-      data.detail || "Login failed"
+      data.detail || "Login failed."
     );
   }
 
   return data;
 }
-
 
 // =====================================================
 // GET ALL PROJECTS
